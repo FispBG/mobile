@@ -3,17 +3,20 @@
 //
 
 #include "Listener.hpp"
-#include "../ueContext/UeContex.hpp"
+
+#include <iostream>
+
+#include "../ueContext/UeContext.hpp"
 #include <thread>
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <unistd.h>
 
-
-ResultStatus Listener::createServerSocket(const uint16_t port, const size_t maxConnections) {
+ResultStatus Listener::createServerSocket(const uint16_t port, const int32_t maxConnections) {
     serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
     if (serverSocket < 0) {
-        RES_ERROR("Fail create socket.");
+        return RES_ERROR("Fail create socket.");
     }
 
     sockaddr_in serverSettings{};
@@ -23,38 +26,48 @@ ResultStatus Listener::createServerSocket(const uint16_t port, const size_t maxC
     serverSettings.sin_port = htons(port);
 
     if (bind(serverSocket, reinterpret_cast<sockaddr*>(&serverSettings), sizeof(serverSettings)) < 0) {
-        RES_ERROR("Fail bind server socket.");
+        close(serverSocket);
+        serverSocket = -1;
+        return RES_ERROR("Fail bind server socket.");
     }
 
     if (listen(serverSocket, maxConnections) < 0) {
-        RES_ERROR("Fail listen server socket.");
+        close(serverSocket);
+        serverSocket = -1;
+        return RES_ERROR("Fail listen server socket.");
     }
 
-    return RES_GOOD;
+    return RES_GOOD("");
 }
 
 void Listener::runServer() {
-    running = true;
+    running.store(true);
     thread = std::thread(&Listener::acceptLoop, this);
-    thread.detach();
 }
 
-void Listener::acceptLoop() const {
-    while (running) {
+void Listener::acceptLoop() {
+    while (running.load()) {
         sockaddr_in clientSettings{};
         socklen_t clientSettingsLen = sizeof(clientSettings);
 
         const int clientSocket = accept(serverSocket, reinterpret_cast<sockaddr*>(&clientSettings), &clientSettingsLen);
 
         if (clientSocket < 0) {
-            if (!running) {
+            if (!running.load()) {
                 break;
             }
             continue;
         }
 
-        auto contextUser = UeContext(clientSocket);
-        std::thread(&UeContext::start, &contextUser).detach();
+        std::cout << "User connected." << std::endl;
+
+        const auto contextUser = std::make_shared<UeContext>(clientSocket, stationsOnline);
+        {
+            std::lock_guard lock(mutex);
+            activeUsers.push_back(contextUser);
+
+        }
+        contextUser->start();
     }
 }
 
@@ -64,4 +77,12 @@ void Listener::stopServer() {
     if (thread.joinable()) {
         thread.join();
     }
+}
+
+Listener::~Listener() {
+    stopServer();
+}
+
+void Listener::setStationsOnline(std::vector<std::shared_ptr<BaseStation>> stations) {
+    stationsOnline = std::move(stations);
 }

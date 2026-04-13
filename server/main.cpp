@@ -1,18 +1,33 @@
 #include <iostream>
 
-// TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
+#include "listener/Listener.hpp"
+#include "baseStation/BaseStation.hpp"
+
+class MME {
+
+};
 
 int main() {
-    // TIP Press <shortcut actionId="RenameElement"/> when your caret is at the <b>lang</b> variable name to see how CLion can help you rename it.
+    auto mme = std::make_shared<MME>();
 
-    const auto lang = "C++";
-    std::cout << "Hello and welcome to " << lang << "!\n";
+    auto bs1 = std::make_shared<BaseStation>(1, 0,   1, 50.0f, 10, 1024, mme);
+    auto bs2 = std::make_shared<BaseStation>(2, 100, 1, 50.0f, 10, 1024, mme);
 
-    for (int i = 1; i <= 5; i++) {
-        // TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-        std::cout << "i = " << i << std::endl;
+    bs1->start();
+    bs2->start();
+
+    const std::vector stations = {bs1, bs2};
+
+    Listener listener;
+    listener.setStationsOnline(stations);
+
+    if (listener.createServerSocket(8080, 10).isGood()) {
+        listener.runServer();
+    } else {
+        return 1;
     }
 
-    return 0;
-    // TIP See CLion help at <a href="https://www.jetbrains.com/help/clion/">jetbrains.com/help/clion/</a>. Also, you can try interactive lessons for CLion by selecting 'Help | Learn IDE Features' from the main menu.
+    while (true) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
+    }
 }
