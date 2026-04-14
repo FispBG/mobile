@@ -3,6 +3,7 @@
 //
 
 #pragma once
+
 #include <cstdint>
 #include <cstring>
 #include <string>
@@ -26,7 +27,7 @@ bool readUint64(const std::string& bytes, size_t& start, uint64_t& variable);
 bool readInt32(const std::string& bytes, size_t& start, int32_t& variable);
 bool readString(const std::string& bytes, size_t& start, std::string& variable);
 bool readBool(const std::string& bytes, size_t& start, bool& variable);
-
+bool readDouble(const std::string& bytes, size_t& start, double& variable);
 
 template <typename T>
 void writeRawBytes(std::string& bytes, T& variable) {

@@ -8,9 +8,9 @@
 #include <unordered_map>
 
 #include "BaseStation.hpp"
-#include "./smsc/SMSC.hpp"
+#include "./register/Register.hpp"
 
-class Registration;
+class SMSC;
 
 struct PendingUser {
     std::string imsi;
@@ -19,6 +19,7 @@ struct PendingUser {
 };
 
 class MME {
+    uint32_t nextTMSI {0};
     int32_t mmeId {0};
     std::shared_ptr<Registration> registration;
     std::shared_ptr<SMSC> smsc;
@@ -37,7 +38,7 @@ public:
     void start();
     void stop();
 
-    void attachSmsc(const std::shared_ptr<SMSC>& smsc);
+    void setSmsc(const std::shared_ptr<SMSC>& smsc);
     void registerStation(int32_t bsId, const std::shared_ptr<BaseStation>& station);
 
     uint64_t generateTMSI(const std::string& imsi, const std::string& imei, int32_t bsId);
@@ -45,11 +46,9 @@ public:
     bool submitSmsFromBs(uint64_t tmsi_src, uint32_t sms_id,
                         const std::string& msisdn_dst, const std::shared_ptr<BaseStation>& sourceStation);
 
-    bool resolveSmsRoute(uint64_t tmsi_src, const std::string& msisdn_dst,
-                          uint64_t& tmsi_dst, std::string& msisdn_src,
-                          std::shared_ptr<BaseStation>& destinationStation);
+    bool resolveSmsRoute(const std::string& msisdn_dst, uint64_t& tmsi_dst, std::shared_ptr<BaseStation>& destinationStation);
 
-    void ackSmsDeliveryReport(uint32_t smsId);
+    void ackSmsDeliveryReport(uint32_t smsId) const;
     void notifySmsDelivery(uint32_t sms_id, bool status);
-    bool changePathToUe(uint64_t tmsi, int32_t newBsId);
+    bool changePathToUe(uint64_t tmsi, int32_t newBsId) const;
 };

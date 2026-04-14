@@ -5,9 +5,9 @@
 #pragma once
 #include <string>
 
-#define RES_ERROR(msg) ResultStatus{Status::Error, msg, __LINE__, __FILE__};
-#define RES_WARNING(msg) ResultStatus{Status::Warning, msg, __LINE__, __FILE__};
-#define RES_GOOD(msg) ResultStatus{Status::Good, msg, 0, ""};
+#define RES_ERROR(msg) ResultStatus{Status::Error, msg, __LINE__, __FILE__}
+#define RES_WARNING(msg) ResultStatus{Status::Warning, msg, __LINE__, __FILE__}
+#define RES_GOOD(msg) ResultStatus{Status::Good, msg, 0, ""}
 
 enum class Status {
     Good,

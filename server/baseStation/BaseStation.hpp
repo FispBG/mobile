@@ -10,7 +10,6 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
-#include <vector>
 
 #include "HandleMessage.hpp"
 
@@ -72,7 +71,8 @@ class BaseStation : public std::enable_shared_from_this<BaseStation>{
     void handleSms(const SmsSendData& data, const std::shared_ptr<UeContext>& sender);
     void handleDeliveryStatus(const DeliveryStatusData& data, const std::shared_ptr<UeContext>& sender);
     void handleAuthConfirm(const AuthData& data, const std::shared_ptr<UeContext>& sender);
-
+    void startHandOver(const HandoverData& data, const std::shared_ptr<BaseStation>& targetStation,
+                                    UserBuffer movedBuffer, const std::shared_ptr<UeContext>& sender);
 public:
 
     BaseStation(int32_t bs_id, int32_t position, int32_t MME_id, float radius,
@@ -92,6 +92,11 @@ public:
     bool MMEReserveBuffer(uint64_t tmsi_dst, uint32_t sms_id);
     bool MMESendTextSms(uint64_t tmsi_dst, uint32_t sms_id,
                                     const std::string& msisdn_src, const std::string& text);
+
+    void removeInactiveUser(const std::shared_ptr<UeContext>& user);
+    bool canAcceptHandover();
+    bool acceptHandover(uint64_t tmsi, const std::shared_ptr<UeContext>& user, const UserBuffer &buffer);
+    void handleHandover(const HandoverData& data, const std::shared_ptr<UeContext>& sender);
 };
 
 

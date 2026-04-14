@@ -22,11 +22,11 @@ class Listener {
     std::thread thread;
     std::mutex mutex;
 
+    void removeInactiveUsers();
     void acceptLoop();
 public:
 
     ResultStatus createServerSocket(uint16_t port, int32_t maxConnections);
-
     void runServer();
     void stopServer();
     ~Listener();

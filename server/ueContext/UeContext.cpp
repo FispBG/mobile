@@ -36,7 +36,11 @@ void UeContext::stop() {
     }
 
     if (listenerThread.joinable()) {
-        listenerThread.join();
+        if (listenerThread.get_id() == std::this_thread::get_id()) {
+            listenerThread.detach();
+        } else {
+            listenerThread.join();
+        }
     }
 }
 
@@ -58,15 +62,30 @@ void UeContext::readSocket() {
             break;
         }
     }
+
+    stop();
 }
 
 void UeContext::sendToBasestation(const HandleMessage& dataStruct) {
-    if (dataStruct.getOperation() == 'R') {
-        for (auto& station : stationsOnline) {
+
+    const char operation = dataStruct.getOperation();
+    if (operation == 'R') {
+        for (const auto& station : stationsOnline) {
             station->addDataInBuffer(dataStruct, shared_from_this());
-            std::cout << 1 << std::endl;
         }
         return;
+    }
+
+    if (operation == 'A') {
+        const auto data = std::get<RegisterUeData>(dataStruct.getData());
+
+        for (const auto& station : stationsOnline) {
+            if (station && station->getId() == data.eNodeb_id) {
+                chooseStation = station;
+                station->addDataInBuffer(dataStruct, shared_from_this());
+                return;
+            }
+        }
     }
 
     if (chooseStation) {
@@ -92,9 +111,7 @@ void UeContext::setUserData(const std::string& IMSI, const std::string& MSISDN, 
 }
 
 void UeContext::setTMSI(const uint64_t TMSI) {
-    if (TMSI == 0) {
-        ueData.TMSI = TMSI;
-    }
+    ueData.TMSI = TMSI;
 }
 
 std::string UeContext::getIMSI() const{
@@ -107,4 +124,20 @@ void UeContext::setBasestation(const std::shared_ptr<BaseStation>& station) {
 
 std::string UeContext::getMSISDN() const {
     return ueData.MSISDN;
+}
+
+bool UeContext::isRunning() const {
+    return running.load();
+}
+
+void UeContext::bsRequestToDeleteInactive(const std::shared_ptr<UeContext>& user) const {
+    for (const auto& station : stationsOnline) {
+        if (station) {
+            station->removeInactiveUser(user);
+        }
+    }
+}
+
+std::vector<std::shared_ptr<BaseStation>> UeContext::getStationsOnline() const {
+    return stationsOnline;
 }

@@ -12,6 +12,7 @@
 
 void logger(const ResultStatus &result) {
     if (result.isGood()) {
+        std::cout << result.getInfoResult().message << std::endl;
         return;
     }
     const std::string typeLog = result.isError() ? "[Error]" : "[Warning]";

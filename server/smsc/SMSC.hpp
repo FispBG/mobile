@@ -4,9 +4,6 @@
 
 #pragma once
 
-
-#pragma once
-
 #include <atomic>
 #include <chrono>
 #include <condition_variable>
@@ -17,7 +14,7 @@
 #include <thread>
 #include <unordered_map>
 
-class BaseStation;
+#include "mme/MME.hpp"
 
 struct SmsContextData {
     uint32_t smsId {};
@@ -32,6 +29,7 @@ struct SmsContextData {
 };
 
 class SMSC {
+    std::weak_ptr<MME> mme;
     std::unordered_map<uint32_t, SmsContextData> sms;
 
     std::size_t maxSmsCount {256};
@@ -44,7 +42,7 @@ class SMSC {
     std::condition_variable condition;
 
     void aliveSmsLoop();
-    void removeOldMessage();
+    std::vector<uint32_t> removeOldMessage();
 
 public:
     explicit SMSC(std::chrono::milliseconds smsTimeDelete);
@@ -66,4 +64,6 @@ public:
 
     bool hasSmsContext(uint32_t smsId) const;
     void notifyDelivery(uint32_t smsId, bool status);
+
+    void setMME(const std::shared_ptr<MME>& mmeObject);
 };

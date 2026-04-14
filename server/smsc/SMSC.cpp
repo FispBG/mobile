@@ -25,6 +25,11 @@ void SMSC::stop() {
     }
 }
 
+void SMSC::setMME(const std::shared_ptr<MME>& mmeObject) {
+    std::lock_guard lock(mutex);
+    mme = mmeObject;
+}
+
 bool SMSC::createSmsContext(const uint64_t tmsiSrc, const uint32_t smsId,
                         const std::string& msisdnSrc, const std::string& msisdnDst) {
 
@@ -104,11 +109,13 @@ bool SMSC::getSourceBsId(const uint32_t smsId, int32_t& bsId) const {
 
 void SMSC::ackDeliveryReport(const uint32_t smsId) {
     std::lock_guard lock(mutex);
+    logger(RES_GOOD("Delete SMS context."));
     sms.erase(smsId);
 }
 
 void SMSC::deleteSmsContext(const uint32_t smsId) {
     std::lock_guard lock(mutex);
+    logger(RES_GOOD("Delete SMS context."));
     sms.erase(smsId);
 }
 
@@ -129,29 +136,34 @@ void SMSC::notifyDelivery(const uint32_t smsId, const bool status) {
 }
 
 void SMSC::aliveSmsLoop() {
-    std::unique_lock lock(mutex);
-
     while (running.load()) {
-        condition.wait_for(lock, std::chrono::milliseconds(250), [this]() {
-            return !running.load();
-        });
+        std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
-        if (!running.load()) {
-            break;
+        std::vector<uint32_t> smsToDelete;
+        {
+            std::unique_lock lock(mutex);
+            smsToDelete = std::move(removeOldMessage());
         }
 
-        removeOldMessage();
+        const auto mmeObject = mme.lock();
+        for (const uint32_t id : smsToDelete) {
+            mmeObject->notifySmsDelivery(id, false);
+        }
     }
 }
 
-void SMSC::removeOldMessage() {
+std::vector<uint32_t> SMSC::removeOldMessage() {
     const auto now = std::chrono::steady_clock::now();
+    std::vector<uint32_t> smsToDelete;
 
-    for (auto it = sms.begin(); it != sms.end(); ) {
-        if (it->second.timeDelete <= now) {
-            it = sms.erase(it);
+    for (auto elem = sms.begin(); elem != sms.end(); ) {
+        if (elem->second.timeDelete <= now) {
+            smsToDelete.push_back(elem->first);
+            elem = sms.erase(elem);
         } else {
-            ++it;
+            ++elem;
         }
     }
+
+    return smsToDelete;
 }

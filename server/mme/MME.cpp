@@ -4,6 +4,8 @@
 
 #include "MME.hpp"
 
+#include "smsc/SMSC.hpp"
+
 MME::MME(const int32_t mmeId, std::shared_ptr<Registration> regInterface):
             mmeId(mmeId), registration(std::move(regInterface)) {}
 
@@ -18,7 +20,7 @@ void MME::stop() {
     pendingUsers.clear();
 }
 
-void MME::attachSmsc(const std::shared_ptr<SMSC>& smscInterface) {
+void MME::setSmsc(const std::shared_ptr<SMSC>& smscInterface) {
     std::lock_guard lock(mutex);
     smsc = smscInterface;
 }
@@ -30,11 +32,13 @@ void MME::registerStation(const int32_t bsId, const std::shared_ptr<BaseStation>
 
 uint64_t MME::generateTMSI(const std::string& imsi, const std::string& imei, const int32_t bsId) {
 
+    logger(RES_GOOD("Check user register in bd."));
     if (!registration->requestAuthInfo(imei, imsi)) {
         return 0;
     }
 
-    const uint64_t tmsi = (static_cast<uint64_t>(static_cast<uint32_t>(mmeId_)) << 32) | nextTmsi_++;
+    logger(RES_GOOD("User registered in bd."));
+    const uint64_t tmsi = (static_cast<uint64_t>(static_cast<uint32_t>(mmeId)) << 32) | nextTMSI++;
     std::lock_guard lock(mutex);
 
     pendingUsers[tmsi] = PendingUser{imsi, imei, bsId};
@@ -49,12 +53,13 @@ bool MME::confirmRegister(const std::string& imsi, const std::string& msisdn,
         const auto user = pendingUsers.find(tmsi);
         pendingUsers.erase(user);
     }
-
-    if (!registration->changePathToUe(tmsi, bsId)) {
+    logger(RES_GOOD("Update location."));
+    if (!registration->updateLocation(tmsi, bsId, imsi)) {
         return false;
     }
 
-    if (!registration->updateLocation(tmsi, bsId, imsi)) {
+    logger(RES_GOOD("Change path to Ue."));
+    if (!registration->changePathToUe(tmsi, bsId)) {
         return false;
     }
 
@@ -69,26 +74,32 @@ bool MME::submitSmsFromBs(const uint64_t tmsi_src, const uint32_t sms_id,
         return false;
     }
 
+    logger(RES_GOOD("Create SMS context"));
     if (!smsc->createSmsContext(tmsi_src, sms_id, msisdn_src, msisdn_dst)) {
         return false;
     }
 
+    logger(RES_GOOD("Station give text SMS"));
     std::string text;
     if (!sourceStation->takeTextFromSms(tmsi_src, sms_id, text)) {
         smsc->deleteSmsContext(sms_id);
         return false;
     }
 
-    if (!smsc->takeSmsText(sms_id, text, sourceStation)) {
+    logger(RES_GOOD("SMSC take text from station."));
+    if (!smsc->takeSmsText(sms_id, text, sourceStation->getId())) {
         smsc->deleteSmsContext(sms_id);
         return false;
     }
 
+    logger(RES_GOOD("Confirm take text to SMSC."));
     sourceStation->confirmTookText(tmsi_src, sms_id);
 
+    logger(RES_GOOD("Find station for delivery."));
     uint64_t tmsi_dst {};
     std::shared_ptr<BaseStation> destinationStation;
-    if (!resolveSmsRoute(tmsi_src, msisdn_dst, tmsi_dst, msisdn_src, destinationStation)) {
+    if (!resolveSmsRoute(msisdn_dst, tmsi_dst, destinationStation)) {
+        smsc->deleteSmsContext(sms_id);
         return true;
     }
 
@@ -96,6 +107,7 @@ bool MME::submitSmsFromBs(const uint64_t tmsi_src, const uint32_t sms_id,
         return true;
     }
 
+    logger(RES_GOOD("SMSC get SMS."));
     std::string textSms;
     if (!smsc->getSmsText(sms_id, textSms)) {
         return true;
@@ -105,34 +117,32 @@ bool MME::submitSmsFromBs(const uint64_t tmsi_src, const uint32_t sms_id,
     return true;
 }
 
-bool MME::resolveSmsRoute(const uint64_t tmsi_src, const std::string& msisdn_dst,
-                          uint64_t& tmsi_dst, std::string& msisdn_src,
-                          std::shared_ptr<BaseStation>& destinationStation) {
+bool MME::resolveSmsRoute(const std::string& msisdn_dst, uint64_t& tmsi_dst, std::shared_ptr<BaseStation>& destinationStation) {
     int32_t findBsId {};
-    if (!registration->resolveDestination(msisdn_dst, tmsi_dst, msisdn_src, findBsId)) {
+    if (!registration->resolveDestination(msisdn_dst, tmsi_dst, findBsId)) {
         return false;
     }
 
     std::lock_guard lock(stationsMutex);
     const auto station = stations.find(findBsId);
-
-    destinationStation = station->second.lock();
-
-    if (!destinationStation) {
+    if (station == stations.end()) {
         return false;
     }
+
+    destinationStation = station->second.lock();
 
     return true;
 }
 
 void MME::notifySmsDelivery(const uint32_t sms_id, const bool status) {
     uint64_t tmsi_src {};
+    logger(RES_GOOD("MME accept report about delivery."));
     if (!smsc->getSourceTmsi(sms_id, tmsi_src)) {
         return;
     }
 
     int32_t bs_id {};
-    if (!smsc->getServingBsId(tmsi_src, bs_id)) {
+    if (!smsc->getSourceBsId(sms_id, bs_id)) {
         return;
     }
 
@@ -152,15 +162,18 @@ void MME::notifySmsDelivery(const uint32_t sms_id, const bool status) {
         return;
     }
 
+    logger(RES_GOOD("Notify SMS delivery to src."));
     sourceStation->sendDeliveryReportToUser(tmsi_src, sms_id, status);
 }
 
-void MME::ackSmsDeliveryReport(const uint32_t smsId) {
+void MME::ackSmsDeliveryReport(const uint32_t smsId) const {
+    logger(RES_GOOD("Dst say, he get sms."));
     smsc->ackDeliveryReport(smsId);
 }
 
-bool MME::changePathToUe(const uint64_t tmsi, const int32_t newBsId) {
+bool MME::changePathToUe(const uint64_t tmsi, const int32_t newBsId) const {
 
+    logger(RES_GOOD("Change path to Ue."));
     if (!registration->changePathToUe(tmsi, newBsId)) {
         return false;
     }

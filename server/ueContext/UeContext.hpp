@@ -42,10 +42,14 @@ public:
 
     void sendToBasestation(const HandleMessage& dataStruct);
     void sendToClient(const std::string& message);
+    void bsRequestToDeleteInactive(const std::shared_ptr<UeContext>& user) const;
 
     void setUserData(const std::string& IMSI, const std::string& MSISDN, const std::string& IMEI);
     void setTMSI(uint64_t TMSI);
     std::string  getIMSI() const;
-    void setBasestation(const std::shared_ptr<BaseStation>& station);\
+    void setBasestation(const std::shared_ptr<BaseStation>& station);
     std::string getMSISDN() const;
+    bool isRunning() const;
+
+    std::vector<std::shared_ptr<BaseStation>> getStationsOnline() const;
 };

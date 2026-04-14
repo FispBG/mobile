@@ -45,8 +45,23 @@ void Listener::runServer() {
     thread = std::thread(&Listener::acceptLoop, this);
 }
 
+void Listener::removeInactiveUsers() {
+    std::lock_guard lock(mutex);
+
+    for (auto user = activeUsers.begin(); user != activeUsers.end(); ) {
+        if (!user->get() || !user->get()->isRunning()) {
+            user->get()->bsRequestToDeleteInactive(*user);
+            user = activeUsers.erase(user);
+        } else {
+            ++user;
+        }
+    }
+}
+
 void Listener::acceptLoop() {
     while (running.load()) {
+        removeInactiveUsers();
+
         sockaddr_in clientSettings{};
         socklen_t clientSettingsLen = sizeof(clientSettings);
 
@@ -72,7 +87,13 @@ void Listener::acceptLoop() {
 }
 
 void Listener::stopServer() {
-    running = false;
+    running.store(false);
+
+    if (serverSocket != -1) {
+        shutdown(serverSocket, SHUT_RDWR);
+        close(serverSocket);
+        serverSocket = -1;
+    }
 
     if (thread.joinable()) {
         thread.join();

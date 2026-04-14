@@ -3,7 +3,7 @@
 //
 
 #include "HandleMessage.hpp"
-#include "BytesTransform.hpp"
+#include "../../commonFiles/byteFunc/BytesTransform.hpp"
 
 ResultStatus HandleMessage::parserRawBytes(const std::string &rawBytes) {
     size_t start {0};
@@ -88,6 +88,16 @@ ResultStatus HandleMessage::parserRawBytes(const std::string &rawBytes) {
             return RES_GOOD("");
         }
 
+        case Operation::HANDOVER: {
+            HandoverData handoverData {};
+            if (!readHandoverData(rawBytes, start, handoverData)) {
+                return RES_ERROR("Fail read HandoverData.");
+            }
+            data = handoverData;
+            operation = 'H';
+            return RES_GOOD("");
+        }
+
         default:
             return RES_ERROR("Unknown operation.");
     }
@@ -110,6 +120,18 @@ bool HandleMessage::readRegisterUeData(const std::string &bytes, size_t& start, 
             readString(bytes, start, dataStruct.IMEI) &&
             readString(bytes, start, dataStruct.MSISDN) &&
             readInt32(bytes, start, dataStruct.eNodeb_id) &&
+            bytes.size() == start;
+
+    if (!checkNeedField) {
+        return false;
+    }
+
+    return true;
+}
+
+bool HandleMessage::readHandoverData(const std::string& bytes, size_t& start, HandoverData& dataStruct) {
+    const bool checkNeedField = readUint64(bytes, start, dataStruct.TMSI) &&
+            readInt32(bytes, start, dataStruct.targetBsId) &&
             bytes.size() == start;
 
     if (!checkNeedField) {
@@ -200,6 +222,17 @@ std::string HandleMessage::serializeMessageData() {
         case 'a': {
             const auto& dataSet = std::get<AuthData>(data);
             writeUint64(rawBytes, dataSet.TMSI);
+            break;
+        }
+        case 'H': {
+            const auto& dataSet = std::get<HandoverData>(data);
+            writeUint64(rawBytes, dataSet.TMSI);
+            writeInt32(rawBytes, dataSet.targetBsId);
+            break;
+        }
+        case 'h': {
+            const auto& dataSet = std::get<HandOverSuccessData>(data);
+            writeInt32(rawBytes, dataSet.station);
             break;
         }
         default:

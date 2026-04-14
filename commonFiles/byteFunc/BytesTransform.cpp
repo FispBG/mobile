@@ -65,6 +65,17 @@ bool readString(const std::string& bytes, size_t& start, std::string& variable) 
     return true;
 }
 
+bool readDouble(const std::string& bytes, size_t& start, double& variable) {
+    uint64_t temp {};
+    if (!readUint64(bytes, start, temp)) {
+        return false;
+    }
+
+    std::memcpy(&variable, &temp, sizeof(double));
+    return true;
+}
+
+
 void writeUint8(std::string &bytes, const uint8_t variable) {
     writeRawBytes(bytes, variable);
 }
