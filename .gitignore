@@ -2,3 +2,5 @@
 */cmake-build-*/
 .idea/
 .clion/
+/server/Testing/build/
+/server/Testing/cmake-build-debug/

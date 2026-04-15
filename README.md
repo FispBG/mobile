@@ -61,19 +61,13 @@ connect к серверу, при отключении disconnect)
 
 ### Запуск тестов
 
-- для клиента <br><br>
-  cd client/tests <br>
-  cmake -B build/ CMakeList.txt <br>
-  cmake --build build/ <br>
-  cd build/<br>
-  ./test<br>
+- для сервера
 
-- для сервера <br><br>
-  cd server/tests <br>
+  cd server/Testing <br>
   cmake -B build/ CMakeList.txt <br>
   cmake --build build/ <br>
   cd build/<br>
-  ./test<br>
+  ./tests
 
 ---
 
@@ -86,72 +80,64 @@ connect к серверу, при отключении disconnect)
 
 ### Структура файлов 
 
+. <br>
 ├── client <br>
-│   ├── build <br>
-│   ├── cmake <br>
-│   │   └── cppcheck.cmake <br>
-│   ├── CMakeLists.txt <br>
-│   ├── includes <br>
-│   │   ├── AppSettings.h <br>
-│   │   ├── DataPool.h <br>
-│   │   ├── Menu.h <br>
-│   │   ├── NetWork.h <br>
-│   │   ├── SocketClient.h <br>
-│   │   └── Tests.h <br>
-│   ├── sources <br>
-│   │   ├── AppSettings.cpp <br>
-│   │   ├── DataPool.cpp <br>
-│   │   ├── main.cpp <br>
-│   │   ├── Menu.cpp <br>
-│   │   ├── NetWork.cpp <br>
-│   │   ├── SocketClient.cpp <br>
-│   │   └── Tests.cpp <br>
-│   └── tests <br>
-│      ├── AppSettingsTest.cpp <br>
-│      ├── CheckAppTest.cpp <br>
-│      ├── CMakeLists.txt <br>
-│      ├── DataPoolTets.cpp <br>
-│      └── FunctionTest.cpp <br>
-├── commonFunc <br>
-│   ├── includes <br>
-│   │   ├── PacketFunction.h <br>
-│   │   ├── ResultStatus.h <br>
-│   │   ├── StandardPackets.h <br>
-│   │   ├── StringFunction.h <br>
-│   │   ├── ValidationFunction.h <br>
-│   │   └── VectorProcess.h <br>
-│   └── sources <br>
-│      ├── PacketFunction.cpp <br>
-│      ├── ResultStatus.cpp <br>
-│      ├── StringFunction.cpp <br>
-│      ├── ValidationFunction.cpp <br>
-│      └── VectorProcess.cpp <br>
-├── README.md <br>
-└── server <br>
-├── cmake <br>
-│   └── cppcheck.cmake <br>
-├── CMakeLists.txt <br>
-├── includes <br>
-│   ├── ConfigApp.h <br>
-│   ├── EpollServer.h <br>
-│   ├── ManageServer.h <br>
-│   ├── MathFunc.h <br>
-│   ├── SocketServer.h <br>
-│   └── ThreadPool.h <br>
-├── sources <br>
-│   ├── ConfigApp.cpp <br>
-│   ├── EpollServer.cpp <br>
+│   ├── context <br>
+│   │   ├── context.cpp <br>
+│   │   └── context.hpp <br>
+│   ├── data <br>
+│   │   └── address_book.json <br>
+│   ├── exchange <br>
+│   │   ├── exchange.cpp <br>
+│   │   └── exchange.hpp <br>
+│   ├── menu <br>
+│   │   ├── menu.cpp <br>
+│   │   └── menu.hpp <br>
 │   ├── main.cpp <br>
-│   ├── ManageServer.cpp <br>
-│   ├── MathFunc.cpp <br>
-│   ├── SocketServer.cpp <br>
-│   └── ThreadPool.cpp <br>
-└── tests <br>
-   ├── CMakeLists.txt <br>
-   ├── configAppTest.cpp <br>
-   ├── epollTest.cpp <br>
-   ├── mathFuncTest.cpp <br>
-   └── socketTest.cpp <br>
+│   └── CMakeLists.txt <br>
+├── commonFiles <br>
+│   ├── byteFunc <br>
+│   │   ├── BytesTransform.cpp <br>
+│   │   └── BytesTransform.hpp <br>
+│   ├── resultFunc <br>
+│   │   ├── ResultFunction.cpp <br>
+│   │   └── ResultFunction.hpp <br>
+│   └── stringFunc <br>
+│       └── StringFunc.hpp <br>
+└── server <br>
+│  ├── baseStation <br>
+│  │   ├── BaseStation.cpp <br>
+│  │   └── BaseStation.hpp <br>
+│  ├── config <br>
+│  │   └── basst.json <br>
+│  ├── listener <br>
+│  │   ├── Listener.cpp <br>
+│  │   └── Listener.hpp <br>
+│  ├── mme <br>
+│  │   ├── MME.cpp <br>
+│  │   └── MME.hpp <br>
+│  ├── register <br>
+│  │   ├── Register.cpp <br>
+│  │   └── Register.hpp <br>
+│  ├── smsc <br>
+│  │   ├── SMSC.cpp <br>
+│  │   └── SMSC.hpp <br>
+│  ├── Testing <br>
+│  │   ├── BaseStationTest.cpp <br>
+│  │   ├── CMakeLists.txt <br>
+│  │   ├── ListenerTest.cpp <br>
+│  │   ├── MMETest.cpp <br>
+│  │   ├── RegisterTest.cpp <br>
+│  │   ├── SMSCTest.cpp <br>
+│  │   └── UeContextTest.cpp <br>
+│  └── ueContext <br>
+│  │  ├── HandleMessage.cpp <br>
+│  │  ├── HandleMessage.hpp <br>
+│  │  ├── UeContext.cpp <br>
+│  │  └── UeContext.hpp <br>
+│  ├── CMakeLists.txt <br>
+│  ├── main.cpp <br>
+│  └── README.md <br>
 
 ---
 
