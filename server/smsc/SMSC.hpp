@@ -25,6 +25,7 @@ struct SmsContextData {
     int32_t sourceBsId {-1};
     bool hasText {false};
     bool delivered {false};
+    bool sendToBs {false};
     std::chrono::steady_clock::time_point timeDelete;
 };
 
@@ -62,8 +63,12 @@ public:
     void ackDeliveryReport(uint32_t smsId);
     void deleteSmsContext(uint32_t smsId);
 
-    bool hasSmsContext(uint32_t smsId) const;
-    void notifyDelivery(uint32_t smsId, bool status);
+    bool getSmsForRetry(uint32_t smsId, std::string& msisdn_src, std::string& msisdn_dst, std::string& text) const;
+
+    std::vector<uint32_t> collectSmsToRetry() const;
+    bool markDelivered(uint32_t smsId);
 
     void setMME(const std::shared_ptr<MME>& mmeObject);
+
+    bool markSmsTrySend(uint32_t smsId);
 };

@@ -51,4 +51,6 @@ public:
     void ackSmsDeliveryReport(uint32_t smsId) const;
     void notifySmsDelivery(uint32_t sms_id, bool status);
     bool changePathToUe(uint64_t tmsi, int32_t newBsId) const;
+
+    bool trySendSMS(const uint32_t smsId);
 };

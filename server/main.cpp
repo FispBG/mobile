@@ -52,7 +52,7 @@ int main(const int argc, char* argv[]) {
         std::cout << "command to run: ./app port        or simple ./app        default port = 9001" << std::endl;
     }
 
-    const uint16_t serverPort = (argc > 1) ? static_cast<uint16_t>(std::stoi(argv[1])) : 9000;
+    const uint16_t serverPort = (argc > 1) ? static_cast<uint16_t>(std::stoi(argv[1])) : 9001;
 
     auto registration = std::make_shared<Registration>();
     auto mme = std::make_shared<MME>(1, registration);

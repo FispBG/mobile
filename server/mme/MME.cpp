@@ -95,25 +95,39 @@ bool MME::submitSmsFromBs(const uint64_t tmsi_src, const uint32_t sms_id,
     logger(RES_GOOD("Confirm take text to SMSC."));
     sourceStation->confirmTookText(tmsi_src, sms_id);
 
+    return true;
+}
+
+bool MME::trySendSMS(const uint32_t smsId) {
+    std::string msisdn_src;
+    std::string msisdn_dst;
+    std::string text;
+
+    if (!smsc->getSmsForRetry(smsId, msisdn_src, msisdn_dst, text)) {
+        return false;
+    }
+
     logger(RES_GOOD("Find station for delivery."));
     uint64_t tmsi_dst {};
     std::shared_ptr<BaseStation> destinationStation;
     if (!resolveSmsRoute(msisdn_dst, tmsi_dst, destinationStation)) {
-        smsc->deleteSmsContext(sms_id);
-        return true;
+        return false;
     }
 
-    if (!destinationStation || !destinationStation->MMEReserveBuffer(tmsi_dst, sms_id)) {
-        return true;
+    if (!destinationStation) {
+        return false;
     }
 
-    logger(RES_GOOD("SMSC get SMS."));
-    std::string textSms;
-    if (!smsc->getSmsText(sms_id, textSms)) {
-        return true;
+    if (!destinationStation->MMEReserveBuffer(tmsi_dst, smsId)) {
+        return false;
     }
 
-    destinationStation->MMESendTextSms(tmsi_dst, sms_id, msisdn_src, textSms);
+    logger(RES_GOOD("MME send sms from SMSC to dst station."));
+    if (!destinationStation->MMESendTextSms(tmsi_dst, smsId, msisdn_src, text)) {
+        return false;
+    }
+
+    smsc->markSmsTrySend(smsId);
     return true;
 }
 

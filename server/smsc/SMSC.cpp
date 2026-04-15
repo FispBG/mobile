@@ -4,6 +4,8 @@
 
 #include "SMSC.hpp"
 
+#include <nlohmann/json.hpp>
+
 SMSC::SMSC(const std::chrono::milliseconds smsTimeDelete): smsLive(smsTimeDelete) {}
 
 SMSC::~SMSC() {
@@ -119,20 +121,18 @@ void SMSC::deleteSmsContext(const uint32_t smsId) {
     sms.erase(smsId);
 }
 
-bool SMSC::hasSmsContext(const uint32_t smsId) const {
-    std::lock_guard lock(mutex);
-    return sms.contains(smsId);
-}
-
-void SMSC::notifyDelivery(const uint32_t smsId, const bool status) {
+bool SMSC::getSmsForRetry(const uint32_t smsId, std::string& msisdn_src, std::string& msisdn_dst, std::string& text) const {
     std::lock_guard lock(mutex);
 
     const auto it = sms.find(smsId);
-    if (it == sms.end()) {
-        return;
+    if (it == sms.end() || !it->second.hasText || it->second.sendToBs) {
+        return false;
     }
 
-    it->second.delivered = status;
+    msisdn_src = it->second.msisdnSrc;
+    msisdn_dst = it->second.msisdnDst;
+    text = it->second.text;
+    return true;
 }
 
 void SMSC::aliveSmsLoop() {
@@ -140,16 +140,53 @@ void SMSC::aliveSmsLoop() {
         std::this_thread::sleep_for(std::chrono::milliseconds(250));
 
         std::vector<uint32_t> smsToDelete;
+        std::vector<uint32_t> smsToRetry;
         {
             std::unique_lock lock(mutex);
             smsToDelete = std::move(removeOldMessage());
+            smsToRetry = collectSmsToRetry();
         }
 
         const auto mmeObject = mme.lock();
-        for (const uint32_t id : smsToDelete) {
-            mmeObject->notifySmsDelivery(id, false);
+        for (const auto& smsId : smsToRetry) {
+            const bool deliveredToBs = mmeObject->trySendSMS(smsId);
+
+            auto lostTime = sms[smsId].timeDelete - std::chrono::steady_clock::now();
+            auto toSeconds = std::chrono::duration_cast<std::chrono::seconds>(lostTime).count();
+
+            logger(RES_GOOD("SMSC retry send sms=" + std::to_string(smsId) +
+                (deliveredToBs ? " success" : " fail") + "time: " +
+                std::to_string(toSeconds)));
+        }
+
+        for (const auto& smsId : smsToDelete) {
+            mmeObject->notifySmsDelivery(smsId, false);
         }
     }
+}
+
+bool SMSC::markDelivered(const uint32_t smsId) {
+    std::lock_guard lock(mutex);
+
+    const auto it = sms.find(smsId);
+    if (it == sms.end()) {
+        return false;
+    }
+
+    it->second.delivered = true;
+    return true;
+}
+
+std::vector<uint32_t> SMSC::collectSmsToRetry() const {
+    std::vector<uint32_t> smsToRetry;
+
+    for (const auto& [smsId, data] : sms) {
+        if (data.hasText && !data.delivered) {
+            smsToRetry.push_back(smsId);
+        }
+    }
+
+    return smsToRetry;
 }
 
 std::vector<uint32_t> SMSC::removeOldMessage() {
@@ -166,4 +203,16 @@ std::vector<uint32_t> SMSC::removeOldMessage() {
     }
 
     return smsToDelete;
+}
+
+bool SMSC::markSmsTrySend(const uint32_t smsId) {
+    std::lock_guard lock(mutex);
+
+    const auto it = sms.find(smsId);
+    if (it == sms.end()) {
+        return false;
+    }
+
+    it->second.sendToBs = true;
+    return true;
 }
