@@ -7,48 +7,61 @@
 #include <atomic>
 #include <mutex>
 #include <string>
-#include <unordered_map>
-
-struct UeRecord {
-    std::string imsi;
-    std::string imei;
-    std::string msisdn;
-    uint64_t tmsi {0};
-    int32_t BsId_src {-1};
-    int32_t vlrId {-1};
-};
+#include <sqlite3.h>
 
 class Registration {
-    std::string storagePath = "registration.db";
+  sqlite3* db{};
+  const std::string storagePath;
 
-    std::unordered_map<std::string, UeRecord> byImsi;
-    std::unordered_map<uint64_t, std::string> tmsiToImsi;
-    std::unordered_map<std::string, std::string> msisdnToImsi;
+  std::mutex mutex;
+  std::atomic<bool> running{false};
 
-    mutable std::mutex mutex;
-    std::atomic<bool> running {false};
+  bool openDb();
+  void closeDb();
+  [[nodiscard]] bool createTable() const;
+  bool execWithoutArgs(const char* query) const;
 
-    bool loadFromDisk();
-    bool saveToDisk() const;
-    void rebuildConvertData();
+  inline sqlite3_stmt* createStatement(const char* query) const;
+  static inline void deleteStatement(sqlite3_stmt* statement);
+
+  template <typename func>
+  bool operationTemplate(const char* query, func function);
 
 public:
-    ~Registration();
+  explicit Registration(std::string storagePath);
+  ~Registration();
 
-    bool start();
-    void stop();
+  bool start();
+  void stop();
 
-    bool addUsers(const std::string& imsi, const std::string& imei, const std::string& msisdn);
+  bool addUsers(const std::string& imsi, const std::string& imei,
+                const std::string& msisdn);
 
-    bool requestAuthInfo(const std::string& imei, const std::string& imsi);
+  bool requestAuthInfo(const std::string& imei, const std::string& imsi);
 
-    bool changePathToUe(uint64_t tmsi, int32_t bsId);
+  bool changePathToUe(uint64_t tmsi, int32_t bsId);
 
-    bool updateLocation(uint64_t tmsi, int32_t vlrId, const std::string& imsi);
+  bool updateLocation(uint64_t tmsi, int32_t vlrId, const std::string& imsi);
 
-    bool getMsisdnByTmsi(uint64_t tmsi, std::string& msisdn) const;
+  bool getMsisdnByTmsi(uint64_t tmsi, std::string& msisdn);
 
-    bool resolveDestination(const std::string& msisdnDst, uint64_t& tmsiDst, int32_t& bsId) const;
+  bool resolveDestination(const std::string& msisdnDst, uint64_t& tmsiDst,
+                          int32_t& bsId);
 };
 
+template <typename func>
+bool Registration::operationTemplate(const char* query, func function) {
+    std::lock_guard lock(mutex);
+    if (db == nullptr) {
+        return false;
+    }
 
+    sqlite3_stmt* stmt = createStatement(query);
+    if (stmt == nullptr) {
+        return false;
+    }
+
+    const bool result = function(stmt);
+    deleteStatement(stmt);
+    return result;
+}

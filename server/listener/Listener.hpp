@@ -3,33 +3,34 @@
 //
 
 #pragma once
+
+#include "../../commonFiles/resultFunc/ResultFunction.hpp"
+
 #include <atomic>
 #include <memory>
 #include <thread>
-
-#include "../../commonFiles/resultFunc/ResultFunction.hpp"
 #include <vector>
 
 class BaseStation;
 class UeContext;
 
 class Listener {
-    int serverSocket{-1};
-    std::vector<std::shared_ptr<BaseStation>> stationsOnline;
-    std::vector<std::shared_ptr<UeContext>> activeUsers;
+  int serverSocket{-1};
+  std::vector<std::shared_ptr<BaseStation>> stationsOnline;
+  std::vector<std::shared_ptr<UeContext>> activeUsers;
 
-    std::atomic<bool> running {false};
-    std::thread thread;
-    std::mutex mutex;
+  std::atomic<bool> running{false};
+  std::thread thread;
+  std::mutex mutex;
 
-    void removeInactiveUsers();
-    void acceptLoop();
-public:
+  void removeInactiveUsers();
+  void acceptLoop();
 
-    ResultStatus createServerSocket(uint16_t port, int32_t maxConnections);
-    void runServer();
-    void stopServer();
-    ~Listener();
+ public:
+  ResultStatus createServerSocket(uint16_t port, int32_t maxConnections);
+  void runServer();
+  void stopServer();
+  ~Listener();
 
-    void setStationsOnline(std::vector<std::shared_ptr<BaseStation>> stations);
+  void setStationsOnline(std::vector<std::shared_ptr<BaseStation>> stations);
 };

@@ -27,7 +27,7 @@ bool readUint64(const std::string& bytes, size_t& start, uint64_t& variable);
 bool readInt32(const std::string& bytes, size_t& start, int32_t& variable);
 bool readString(const std::string& bytes, size_t& start, std::string& variable);
 bool readBool(const std::string& bytes, size_t& start, bool& variable);
-bool readDouble(const std::string& bytes, size_t& start, double& variable);
+bool readFloat(const std::string& bytes, size_t& start, float& variable);
 
 template <typename T>
 void writeRawBytes(std::string& bytes, T& variable) {
@@ -41,4 +41,4 @@ void writeUint64(std::string& bytes, uint64_t variable);
 void writeInt32(std::string& bytes, int32_t variable);
 void writeString(std::string& bytes, const std::string& variable);
 void writeBool(std::string& bytes, bool variable);
-void writeDouble(std::string& bytes, double variable);
+void writeFloat(std::string& bytes, float variable);

@@ -3,18 +3,18 @@
     "bs_id": 1,
     "position": -100,
     "MME_id": 1,
-    "radius": 120.0,
+    "radius": 120,
     "maxConnections": 4,
     "bufferSizeMax": 4,
-    "enabled": true
+    "networkVersion": 4
   },
   {
     "bs_id": 2,
     "position": 100,
     "MME_id": 1,
-    "radius": 120.0,
+    "radius": 120,
     "maxConnections": 4,
     "bufferSizeMax": 4,
-    "enabled": true
+    "networkVersion": 4
   }
 ]

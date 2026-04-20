@@ -3,220 +3,224 @@
 //
 
 #include "Register.hpp"
+#include "../commonFiles/resultFunc/ResultFunction.hpp"
 
 #include <fstream>
-#include <sstream>
+#include <iostream>
 #include <utility>
-#include <vector>
 
-Registration::~Registration() {
-    stop();
+Registration::Registration(std::string storagePath)
+    : storagePath(std::move(storagePath)){};
+
+Registration::~Registration() { stop(); }
+
+bool Registration::openDb() {
+  if (db != nullptr) {
+    return true;
+  }
+
+  if (sqlite3_open(storagePath.c_str(), &db) != SQLITE_OK) {
+    return false;
+  }
+
+  return true;
+}
+
+void Registration::closeDb() {
+  if (db != nullptr) {
+    sqlite3_close(db);
+    db = nullptr;
+  }
+}
+
+bool Registration::execWithoutArgs(const char* query) const {
+  char* error;
+  const auto execCode = sqlite3_exec(db, query, nullptr, nullptr, &error);
+
+  if (error != nullptr) {
+    logger(RES_ERROR(error));
+    sqlite3_free(error);
+  }
+
+  return execCode == SQLITE_OK;
+}
+
+bool Registration::createTable() const {
+  constexpr auto query = R"sql(
+    CREATE TABLE IF NOT EXISTS users (
+      imsi TEXT PRIMARY KEY,
+      imei TEXT NOT NULL UNIQUE,
+      msisdn TEXT NOT NULL UNIQUE,
+      tmsi INTEGER UNIQUE,
+      stationId INTEGER NOT NULL DEFAULT -1,
+      vlrId INTEGER NOT NULL DEFAULT -1
+    );
+  )sql";
+
+  return execWithoutArgs(query);
 }
 
 bool Registration::start() {
+  if (running.load()) {
+    return false;
+  }
+
+  {
     std::lock_guard lock(mutex);
-    if (running.load()) {
-        return false;
-    }
-    if (loadFromDisk()) {
-        return false;
+
+    if (!openDb()) {
+      std::cout << "Error opening database" << std::endl;
+      return false;
     }
 
-    loadFromDisk();
-    running.store(true);
-    return true;
+    if (!createTable()) {
+      std::cout << "Error creating table" << std::endl;
+      closeDb();
+      return false;
+    }
+  }
+
+  running.store(true);
+  return true;
 }
 
 void Registration::stop() {
-    std::lock_guard lock(mutex);
-    if (!running.load()) {
-        return;
-    }
-    saveToDisk();
-    running.store(false);
+  if (!running.load()) {
+    return;
+  }
+
+  closeDb();
+  running.store(false);
 }
 
-bool Registration::addUsers(const std::string& imsi, const std::string& imei, const std::string& msisdn) {
-    std::lock_guard lock(mutex);
+inline sqlite3_stmt* Registration::createStatement(const char* query) const {
+  sqlite3_stmt* stmt = nullptr;
+  if (sqlite3_prepare_v2(db, query, -1, &stmt, nullptr) != SQLITE_OK) {
+    return nullptr;
+  }
+  return stmt;
+};
 
-    UeRecord& record = byImsi[imsi];
-    record.imsi = imsi;
-    record.imei = imei;
-    record.msisdn = msisdn;
-
-    rebuildConvertData();
-    if (running.load()) {
-        return saveToDisk();
-    }
-    return true;
+inline void Registration::deleteStatement(sqlite3_stmt* statement) {
+  if (statement != nullptr) {
+    sqlite3_finalize(statement);
+  }
 }
 
-bool Registration::requestAuthInfo(const std::string& imei, const std::string& imsi) {
-    std::lock_guard lock(mutex);
+bool Registration::addUsers(const std::string& imsi, const std::string& imei,
+                            const std::string& msisdn) {
+  constexpr auto query = R"sql(
+    INSERT INTO users (imsi, imei, msisdn)
+    VALUES (?, ?, ?)
+    ON CONFLICT(imsi) DO UPDATE SET
+      imei = excluded.imei,
+      msisdn = excluded.msisdn;
+  )sql";
 
-    const auto it = byImsi.find(imsi);
-    if (it == byImsi.end()) {
-        return false;
-    }
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_text(statement, 1, imsi.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(statement, 2, imei.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(statement, 3, msisdn.c_str(), -1, SQLITE_TRANSIENT);
+    return sqlite3_step(statement) == SQLITE_DONE;
+  });
+}
 
-    return it->second.imei == imei;
+bool Registration::requestAuthInfo(const std::string& imei,
+                                   const std::string& imsi) {
+  constexpr auto query = R"sql(
+    SELECT 1
+    FROM users
+    WHERE imsi = ?
+    AND imei = ?
+  )sql";
+
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_text(statement, 1, imsi.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(statement, 2, imei.c_str(), -1, SQLITE_TRANSIENT);
+    return sqlite3_step(statement) == SQLITE_ROW;
+  });
 }
 
 bool Registration::changePathToUe(const uint64_t tmsi, const int32_t bsId) {
-    std::lock_guard lock(mutex);
+  constexpr auto query = R"sql(
+    UPDATE users
+    SET stationId = ?
+    WHERE tmsi = ?
+  )sql";
 
-    const auto tmsiAndImsi = tmsiToImsi.find(tmsi);
-    if (tmsiAndImsi == tmsiToImsi.end()) {
-        return false;
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_int(statement, 1, bsId);
+    sqlite3_bind_int64(statement, 2, static_cast<sqlite3_int64>(tmsi));
+
+    if (sqlite3_step(statement) != SQLITE_DONE) {
+      return false;
     }
-
-    const auto recordUe = byImsi.find(tmsiAndImsi->second);
-    if (recordUe == byImsi.end()) {
-        return false;
-    }
-
-    recordUe->second.BsId_src = bsId;
-    saveToDisk();
-    return true;
+    return sqlite3_changes(db) > 0;
+  });
 }
 
-bool Registration::updateLocation(const uint64_t tmsi, const int32_t vlrId, const std::string& imsi) {
-    std::lock_guard lock(mutex);
+bool Registration::updateLocation(const uint64_t tmsi, const int32_t vlrId,
+                                  const std::string& imsi) {
+  constexpr auto query = R"sql(
+    UPDATE users
+    SET tmsi = ?,
+      stationId = ?,
+      vlrId = ?
+    WHERE imsi = ?
+  )sql";
 
-    const auto recordIt = byImsi.find(imsi);
-    if (recordIt == byImsi.end()) {
-        return false;
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_int64(statement, 1, static_cast<sqlite3_int64>(tmsi));
+    sqlite3_bind_int(statement, 2, vlrId);
+    sqlite3_bind_int(statement, 3, vlrId);
+    sqlite3_bind_text(statement, 4, imsi.c_str(), -1, SQLITE_TRANSIENT);
+
+    if (sqlite3_step(statement) != SQLITE_DONE) {
+      return false;
     }
 
-    if (recordIt->second.tmsi != 0) {
-        tmsiToImsi.erase(recordIt->second.tmsi);
-    }
-
-    recordIt->second.tmsi = tmsi;
-    recordIt->second.vlrId = vlrId;
-    if (recordIt->second.BsId_src < 0) {
-        recordIt->second.BsId_src = vlrId;
-    }
-
-    tmsiToImsi[tmsi] = imsi;
-    msisdnToImsi[recordIt->second.msisdn] = imsi;
-
-    if (running.load()) {
-        saveToDisk();
-    }
-
-    return true;
+    return sqlite3_changes(db) > 0;
+  });
 }
 
-bool Registration::getMsisdnByTmsi(const uint64_t tmsi, std::string& msisdn) const {
-    std::lock_guard lock(mutex);
+bool Registration::getMsisdnByTmsi(const uint64_t tmsi, std::string& msisdn) {
+  constexpr auto query = R"sql(
+    SELECT msisdn
+    FROM users
+    WHERE tmsi = ?
+  )sql";
 
-    const auto mapIt = tmsiToImsi.find(tmsi);
-    if (mapIt == tmsiToImsi.end()) {
-        return false;
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_int64(statement, 1, static_cast<sqlite3_int64>(tmsi));
+
+    if (sqlite3_step(statement) != SQLITE_ROW) {
+      return false;
     }
 
-    const auto recordIt = byImsi.find(mapIt->second);
-    if (recordIt == byImsi.end()) {
-        return false;
-    }
-
-    msisdn = recordIt->second.msisdn;
+    msisdn = reinterpret_cast<const char*>(sqlite3_column_text(statement, 0));
     return true;
+  });
 }
 
-bool Registration::resolveDestination(const std::string& msisdnDst, uint64_t& tmsi_dst, int32_t& bsId) const {
-    std::lock_guard lock(mutex);
+bool Registration::resolveDestination(const std::string& msisdnDst,
+                                      uint64_t& tmsiDst, int32_t& bsId) {
+  constexpr auto query = R"sql(
+    SELECT tmsi, stationId
+    FROM users
+    WHERE msisdn = ?
+    AND tmsi IS NOT NULL
+    AND stationId >= 0
+  )sql";
 
-    const auto imsiIt = msisdnToImsi.find(msisdnDst);
-    if (imsiIt == msisdnToImsi.end()) {
-        return false;
+  return operationTemplate(query, [&](sqlite3_stmt* statement) {
+    sqlite3_bind_text(statement, 1, msisdnDst.c_str(), -1, SQLITE_TRANSIENT);
+
+    if (sqlite3_step(statement) != SQLITE_ROW) {
+      return false;
     }
 
-    const auto recordIt = byImsi.find(imsiIt->second);
-    if (recordIt == byImsi.end()) {
-        return false;
-    }
-
-    if (recordIt->second.tmsi == 0 || recordIt->second.BsId_src < 0) {
-        return false;
-    }
-
-    tmsi_dst = recordIt->second.tmsi;
-    bsId = recordIt->second.BsId_src;
-
+    tmsiDst = sqlite3_column_int64(statement, 0);
+    bsId = sqlite3_column_int(statement, 1);
     return true;
-}
-
-bool Registration::loadFromDisk() {
-    byImsi.clear();
-    tmsiToImsi.clear();
-    msisdnToImsi.clear();
-
-    std::ifstream input(storagePath);
-    if (!input.is_open()) {
-        return false;
-    }
-
-    std::string line;
-    while (std::getline(input, line)) {
-        if (line.empty()) {
-            continue;
-        }
-
-
-        std::stringstream ss(line);
-        std::string token;
-        std::vector<std::string> parts;
-        while (std::getline(ss, token, '|')) {
-            parts.push_back(token);
-        }
-
-        if (parts.size() < 6) {
-            continue;
-        }
-
-        UeRecord record;
-        record.imsi = parts[0];
-        record.imei = parts[1];
-        record.msisdn = parts[2];
-        record.tmsi = std::stoull(parts[3]);
-        record.BsId_src = std::stoi(parts[4]);
-        record.vlrId = std::stoi(parts[5]);
-
-        byImsi[record.imsi] = std::move(record);
-    }
-
-    rebuildConvertData();
-    return true;
-}
-
-bool Registration::saveToDisk() const {
-    std::ofstream output(storagePath, std::ios::trunc);
-    if (!output.is_open()) {
-        return false;
-    }
-
-    for (const auto& record : byImsi) {
-        output << record.second.imsi << '|'
-               << record.second.imei << '|'
-               << record.second.msisdn << '|'
-               << record.second.tmsi << '|'
-               << record.second.BsId_src << '|'
-               << record.second.vlrId << '\n';
-    }
-
-    return true;
-}
-
-void Registration::rebuildConvertData() {
-    tmsiToImsi.clear();
-    msisdnToImsi.clear();
-
-    for (const auto& [imsi, record] : byImsi) {
-        msisdnToImsi[record.msisdn] = imsi;
-        if (record.tmsi != 0) {
-            tmsiToImsi[record.tmsi] = imsi;
-        }
-    }
+  });
 }

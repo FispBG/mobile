@@ -1,6 +1,6 @@
 # mobile
 
-### Описание: 
+### Описание:
 Клиенто-серверное приложение, которое имеет приложение с раздельным
 запуском для сервера и клиента.
 
@@ -8,10 +8,10 @@
 
 Клиенты могу присоединяться к серверу и обмениваться сообщениями.
 
-#### Запустив клиента есть различные команды: 
+#### Запустив клиента есть различные команды:
 
-- ACTION - включает и выключает устройство (при включении 
-connect к серверу, при отключении disconnect)
+- ACTION - включает и выключает устройство (при включении
+  connect к серверу, при отключении disconnect)
 - MOVE - изменение позиции в пространстве по 1 оси
 - STATUS - вывод текущего состояния подключения к серверу
 - SMS - отправка смс по номеру телефона
@@ -31,15 +31,20 @@ connect к серверу, при отключении disconnect)
 
 #### Команды для запуска клиента:
 
-- Запуск клиента после сборки: ./client [ip] [port] [msisdn] [imsi] [imei] [position]
+- Запуск клиента после сборки: ```./client -ip <ip> -port <port> -msisdn <msisdn> -imsi <imsi> - imei <imei> -position <position>```
 - Все параметры обязательны
-- Получение справки по возможным флагам: ./client --help
+- Получение справки по возможным флагам: ```./client --help```
+- Готовый пресет для запуска клиента 1:
+  ```./client -ip 127.0.0.1 -port 9000 -msisdn 89991112233 -imsi 12345601112233 -imei 158863118273320 -position 100```
+- Готовый пресет для запуска клиента 2:
+  ```./client -ip 127.0.0.1 -port 9000 -msisdn 89993334455 -imsi 12345603334455 -imei 325314891006270 -position -100```
+
 
 #### Команды для запуска сервера:
 
-- Запуск клиента после сборки: ./server 9000
+- Запуск клиента после сборки: ```./server 9000```
 - или просто ./server, стандартный порт 9000
-- Получение справки по возможным флагам: ./client --help
+- Получение справки по возможным флагам: ```./client --help```
 
 ### Зависимости
 
@@ -55,8 +60,25 @@ connect к серверу, при отключении disconnect)
 - CMake >= 3.28
 
 #### Сборка
-- cmake
+Необходим cmake >= 3.28
 
+- Сборка для сервера из корня(../mobile)
+cd server <br>
+cmake -B build/ CMakeList.txt <br>
+cmake --build build/ <br>
+
+Или через запуск скрипта <br>
+cd server <br>
+bash ./run.sh <br>
+
+- Сборка для сервера из корня(../mobile)
+cd client <br>
+cmake -B build/ CMakeList.txt <br>
+cmake --build build/ <br>
+
+Или через запуск скрипта <br>
+cd client <br>
+bash ./run.sh <br>
 ---
 
 ### Запуск тестов
@@ -72,27 +94,48 @@ connect к серверу, при отключении disconnect)
 ---
 
 ### Санитазеры и статический анализатор
-- для запуска адресного санитайзера в CMakeList.txt по адресам ./server/
-раскомментируйте: 
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address")
+- Сборка для сервера из корня c санитайзерами и cppcheck(../mobile)
+  cd server <br>
+  cmake -B build/ CMakeList.txt -DCMAKE_BUILD_TYPE=Debug <br>
+  cmake --build build/ <br>
+
+Или через запуск скрипта <br>
+cd server <br>
+bash ./run.sh Debug <br>
+
+- Сборка для сервера из корня c санитайзерами и cppcheck(../mobile)
+  cd client <br>
+  cmake -B build/ CMakeList.txt -DCMAKE_BUILD_TYPE=Debug <br>
+  cmake --build build/ <br>
+
+Или через запуск скрипта <br>
+cd client <br>
+bash ./run.sh Debug <br>
 
 ---
 
-### Структура файлов 
+### Структура файлов
 
 . <br>
 ├── client <br>
 │   ├── context <br>
-│   │   ├── context.cpp <br>
-│   │   └── context.hpp <br>
+│   │   ├── Context.cpp <br>
+│   │   ├── Context.cpp <br>
+│   │   ├── DataStorage.cpp <br>
+│   │   └── DataStorage.hpp <br>
 │   ├── data <br>
 │   │   └── address_book.json <br>
 │   ├── exchange <br>
-│   │   ├── exchange.cpp <br>
-│   │   └── exchange.hpp <br>
+│   │   ├── ReadPacket.cpp <br>
+│   │   ├── ReadPacket.cpp <br>
+│   │   ├── SerializedPacket.cpp <br>
+│   │   ├── Exchange.cpp <br>
+│   │   └── Exchange.hpp <br>
 │   ├── menu <br>
-│   │   ├── menu.cpp <br>
-│   │   └── menu.hpp <br>
+│   │   ├── MenuItem.cpp <br>
+│   │   ├── MenuItem.cpp <br>
+│   │   ├── Menu.cpp <br>
+│   │   └── Menu.hpp <br>
 │   ├── main.cpp <br>
 │   └── CMakeLists.txt <br>
 ├── commonFiles <br>
@@ -102,8 +145,14 @@ connect к серверу, при отключении disconnect)
 │   ├── resultFunc <br>
 │   │   ├── ResultFunction.cpp <br>
 │   │   └── ResultFunction.hpp <br>
+│   ├── inputArgsFunc <br>
+│   │   └── InputArgsFunc.hpp <br>
+│   ├── utilityFunc <br>
+│   │   └── UtilityFunc.hpp <br>
+│   ├── validateFunc <br>
+│   │   └── ValidateFunc.hpp <br>
 │   └── stringFunc <br>
-│       └── StringFunc.hpp <br>
+│     └── StringFunc.hpp <br>
 └── server <br>
 │  ├── baseStation <br>
 │  │   ├── BaseStation.cpp <br>
@@ -129,6 +178,7 @@ connect к серверу, при отключении disconnect)
 │  │   ├── MMETest.cpp <br>
 │  │   ├── RegisterTest.cpp <br>
 │  │   ├── SMSCTest.cpp <br>
+│  │   ├── TestConfug.hpp <br>
 │  │   └── UeContextTest.cpp <br>
 │  └── ueContext <br>
 │  │  ├── HandleMessage.cpp <br>
