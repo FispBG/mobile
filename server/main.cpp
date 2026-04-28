@@ -51,7 +51,7 @@ int main(const int argc, const char** argv) {
   uint16_t serverPort{0};
 
   if (!(argc > 1 && isPort(argv[1], serverPort))) {
-    serverPort = 9000;
+    serverPort = 9001;
   }
 
   auto registration =

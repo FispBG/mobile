@@ -39,7 +39,7 @@ class Context {
   DeviceSpec deviceSpec{};
   ConnectionSpec connectionSpec{};
 
-  std::mutex smsMutex;
+  mutable std::mutex smsMutex;
   std::vector<SmsOutData> smsOut;
   std::vector<SmsInData> smsIn;
 
@@ -73,6 +73,6 @@ class Context {
   void addInSms(const SmsInData &sms);
   void updateOutSmsStatus(uint32_t smsId, const std::string &status);
 
-  std::vector<SmsOutData> getOutSms();
-  std::vector<SmsInData> getInSms();
+  std::vector<SmsOutData> getOutSms() const;
+  std::vector<SmsInData> getInSms() const;
 };

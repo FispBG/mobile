@@ -81,7 +81,9 @@ int main(const int argc, const char** argv) {
 
     menu.findItem(hashString(command.c_str()));
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
-    std::cout << "Press any button: ";
-    getchar();
+
+    std::cout << "Press enter button: ";
+    std::string waitEnter;
+    std::getline(std::cin, waitEnter);
   }
 }

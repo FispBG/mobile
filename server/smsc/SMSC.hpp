@@ -57,7 +57,7 @@ class SMSC {
                         const std::string& msisdnDst);
 
   template <typename function>
-  bool templateChangeData(uint32_t smsId, function func);
+  bool templateGetData(uint32_t smsId, function func);
 
   bool takeSmsText(uint32_t smsId, const std::string& text, int32_t sourceBsId);
   bool getSmsText(uint32_t smsId, std::string& text);
@@ -79,7 +79,7 @@ class SMSC {
 };
 
 template <typename function>
-bool SMSC::templateChangeData(const uint32_t smsId, function func) {
+bool SMSC::templateGetData(const uint32_t smsId, function func) {
     std::lock_guard lock(mutex);
 
     const auto it = sms.find(smsId);

@@ -103,7 +103,7 @@ void SMSC::aliveSmsLoop() {
     std::vector<uint32_t> smsToRetry;
     {
       std::unique_lock lock(mutex);
-      smsToDelete = std::move(removeOldMessage());
+      smsToDelete = removeOldMessage();
       smsToRetry = collectSmsToRetry();
     }
 
@@ -150,7 +150,7 @@ std::vector<uint32_t> SMSC::removeOldMessage() {
 }
 
 bool SMSC::markSmsTrySend(const uint32_t smsId) {
-  return templateChangeData(
+  return templateGetData(
       smsId,
       [](const std::unordered_map<uint32_t, SmsContextData>::iterator& it) {
         it->second.sendToBs = true;
@@ -158,7 +158,7 @@ bool SMSC::markSmsTrySend(const uint32_t smsId) {
 }
 
 bool SMSC::markDelivered(const uint32_t smsId) {
-  return templateChangeData(
+  return templateGetData(
       smsId,
       [](const std::unordered_map<uint32_t, SmsContextData>::iterator& it) {
         it->second.delivered = true;
@@ -166,28 +166,25 @@ bool SMSC::markDelivered(const uint32_t smsId) {
 }
 
 bool SMSC::getSmsText(const uint32_t smsId, std::string& text) {
-  return templateChangeData(
+  return templateGetData(
       smsId,
-      [&text](
-          const std::unordered_map<uint32_t, SmsContextData>::iterator& it) {
+      [&text](const auto& it) {
         text = it->second.text;
       });
 }
 
 bool SMSC::getSourceTmsi(const uint32_t smsId, uint64_t& tmsiSrc) {
-  return templateChangeData(
+  return templateGetData(
       smsId,
-      [&tmsiSrc](
-          const std::unordered_map<uint32_t, SmsContextData>::iterator& it) {
+      [&tmsiSrc](const auto& it) {
         tmsiSrc = it->second.tmsiSrc;
       });
 }
 
 bool SMSC::getSourceBsId(const uint32_t smsId, int32_t& bsId) {
-  templateChangeData(
+  templateGetData(
       smsId,
-      [&bsId](
-          const std::unordered_map<uint32_t, SmsContextData>::iterator& it) {
+      [&bsId](const auto& it) {
         bsId = it->second.sourceBsId;
       });
 

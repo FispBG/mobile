@@ -60,12 +60,12 @@ void Context::updateOutSmsStatus(const uint32_t smsId,
   }
 }
 
-std::vector<SmsOutData> Context::getOutSms() {
+std::vector<SmsOutData> Context::getOutSms() const {
   std::lock_guard lock(smsMutex);
   return smsOut;
 }
 
-std::vector<SmsInData> Context::getInSms() {
+std::vector<SmsInData> Context::getInSms() const {
   std::lock_guard lock(smsMutex);
   return smsIn;
 }
